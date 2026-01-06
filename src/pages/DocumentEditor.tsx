@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import {
   Select,
   SelectContent,
@@ -260,13 +261,11 @@ export default function DocumentEditor() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="content">Content</Label>
-              <Textarea
-                id="content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
+              <Label>Content</Label>
+              <RichTextEditor
+                content={content}
+                onChange={setContent}
                 placeholder="Write your documentation here..."
-                className="min-h-[400px] font-mono text-sm"
               />
             </div>
           </div>
