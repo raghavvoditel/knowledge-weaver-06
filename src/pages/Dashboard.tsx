@@ -33,6 +33,7 @@ interface Document {
   id: string;
   title: string;
   summary: string | null;
+  content: string | null;
   type: string;
   status: string;
   tags: string[];
@@ -78,7 +79,7 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from("documents")
-        .select("*")
+        .select("id, title, summary, content, type, status, tags, is_public, created_at, updated_at")
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
@@ -109,9 +110,12 @@ export default function Dashboard() {
   };
 
   const filteredDocuments = documents.filter((doc) => {
+    const query = searchQuery.toLowerCase();
     const matchesSearch =
-      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (doc.summary?.toLowerCase().includes(searchQuery.toLowerCase()));
+      doc.title.toLowerCase().includes(query) ||
+      doc.summary?.toLowerCase().includes(query) ||
+      doc.content?.toLowerCase().includes(query) ||
+      doc.tags?.some(tag => tag.toLowerCase().includes(query));
     const matchesType = !typeFilter || doc.type === typeFilter;
     return matchesSearch && matchesType;
   });
