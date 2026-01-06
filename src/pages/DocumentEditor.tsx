@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { VersionHistory } from "@/components/VersionHistory";
+import { exportAsMarkdown, exportAsPDF, exportAsWord } from "@/lib/exportUtils";
 import {
   Select,
   SelectContent,
@@ -15,6 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Lightbulb,
   ArrowLeft,
@@ -25,7 +33,10 @@ import {
   Trash2,
   Copy,
   Check,
-  ExternalLink,
+  Download,
+  FileText,
+  FileCode,
+  FileType,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -67,6 +78,7 @@ export default function DocumentEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [versionCount, setVersionCount] = useState(0);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -130,6 +142,20 @@ export default function DocumentEditor() {
         publicSlug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
       }
 
+      // Save a version before updating
+      if (user && id) {
+        const newVersionNumber = versionCount + 1;
+        await supabase.from("document_versions").insert({
+          document_id: id,
+          user_id: user.id,
+          title,
+          content,
+          summary,
+          version_number: newVersionNumber,
+        });
+        setVersionCount(newVersionNumber);
+      }
+
       const { error } = await supabase
         .from("documents")
         .update({
@@ -152,7 +178,7 @@ export default function DocumentEditor() {
 
       toast({
         title: "Document saved",
-        description: "Your changes have been saved",
+        description: "Version saved to history",
       });
     } catch (err) {
       toast({
@@ -163,6 +189,42 @@ export default function DocumentEditor() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleRestoreVersion = (version: { title: string; content: string | null; summary: string | null }) => {
+    setTitle(version.title);
+    setContent(version.content || "");
+    setSummary(version.summary || "");
+  };
+
+  const handleExportMarkdown = () => {
+    exportAsMarkdown({
+      title,
+      content,
+      summary,
+      type,
+      tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+    });
+  };
+
+  const handleExportPDF = async () => {
+    await exportAsPDF({
+      title,
+      content,
+      summary,
+      type,
+      tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+    });
+  };
+
+  const handleExportWord = () => {
+    exportAsWord({
+      title,
+      content,
+      summary,
+      type,
+      tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+    });
   };
 
   const deleteDocument = async () => {
@@ -216,7 +278,34 @@ export default function DocumentEditor() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {id && (
+              <VersionHistory documentId={id} onRestore={handleRestoreVersion} />
+            )}
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Download className="w-4 h-4" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportMarkdown}>
+                  <FileCode className="w-4 h-4 mr-2" />
+                  Markdown (.md)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  PDF (.pdf)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportWord}>
+                  <FileType className="w-4 h-4 mr-2" />
+                  Word (.doc)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button variant="ghost" size="icon" onClick={deleteDocument}>
               <Trash2 className="w-5 h-5 text-destructive" />
             </Button>

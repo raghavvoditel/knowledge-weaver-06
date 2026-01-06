@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      document_versions: {
+        Row: {
+          change_description: string | null
+          content: string | null
+          created_at: string
+          document_id: string
+          id: string
+          summary: string | null
+          title: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          change_description?: string | null
+          content?: string | null
+          created_at?: string
+          document_id: string
+          id?: string
+          summary?: string | null
+          title: string
+          user_id: string
+          version_number?: number
+        }
+        Update: {
+          change_description?: string | null
+          content?: string | null
+          created_at?: string
+          document_id?: string
+          id?: string
+          summary?: string | null
+          title?: string
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           content: string | null
