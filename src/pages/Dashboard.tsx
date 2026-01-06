@@ -4,6 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { TemplateSelector } from "@/components/TemplateSelector";
+import { exportAsMarkdown, exportAsPDF } from "@/lib/exportUtils";
 import { 
   Lightbulb, 
   Plus, 
@@ -19,7 +23,10 @@ import {
   Filter,
   MoreVertical,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Download,
+  X,
+  CheckSquare
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -51,11 +58,11 @@ const typeLabels: Record<string, string> = {
 };
 
 const typeColors: Record<string, string> = {
-  sop: "bg-blue-100 text-blue-700",
-  how_to: "bg-green-100 text-green-700",
-  product_doc: "bg-purple-100 text-purple-700",
-  reflection: "bg-amber-100 text-amber-700",
-  general: "bg-gray-100 text-gray-700",
+  sop: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  how_to: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  product_doc: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+  reflection: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  general: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 };
 
 export default function Dashboard() {
@@ -66,6 +73,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -100,6 +109,11 @@ export default function Dashboard() {
       const { error } = await supabase.from("documents").delete().eq("id", id);
       if (error) throw error;
       setDocuments(documents.filter((d) => d.id !== id));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       toast({ title: "Document deleted" });
     } catch (err) {
       toast({
@@ -107,6 +121,69 @@ export default function Dashboard() {
         title: "Error deleting document",
       });
     }
+  };
+
+  const deleteSelectedDocuments = async () => {
+    if (selectedIds.size === 0) return;
+    
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase
+        .from("documents")
+        .delete()
+        .in("id", ids);
+      
+      if (error) throw error;
+      
+      setDocuments(documents.filter((d) => !selectedIds.has(d.id)));
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      toast({ title: `${ids.length} document(s) deleted` });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error deleting documents",
+      });
+    }
+  };
+
+  const exportSelectedDocuments = async () => {
+    if (selectedIds.size === 0) return;
+    
+    const selectedDocs = documents.filter((d) => selectedIds.has(d.id));
+    
+    for (const doc of selectedDocs) {
+      exportAsMarkdown({
+        title: doc.title,
+        content: doc.content || "",
+        summary: doc.summary || undefined,
+        type: doc.type,
+        tags: doc.tags,
+      });
+    }
+    
+    toast({ title: `${selectedDocs.length} document(s) exported` });
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(filteredDocuments.map((d) => d.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
   };
 
   const filteredDocuments = documents.filter((doc) => {
@@ -137,7 +214,16 @@ export default function Dashboard() {
             <span className="text-xl font-bold">FounderMind</span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <TemplateSelector
+              trigger={
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">New Doc</span>
+                </Button>
+              }
+            />
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground hidden sm:block">
               {user?.email}
             </span>
@@ -209,7 +295,46 @@ export default function Dashboard() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button
+            variant={selectionMode ? "secondary" : "outline"}
+            className="gap-2"
+            onClick={() => {
+              setSelectionMode(!selectionMode);
+              if (selectionMode) clearSelection();
+            }}
+          >
+            <CheckSquare className="w-4 h-4" />
+            <span className="hidden sm:inline">Select</span>
+          </Button>
         </div>
+
+        {/* Bulk actions bar */}
+        {selectionMode && selectedIds.size > 0 && (
+          <div className="flex items-center justify-between bg-secondary/50 border border-border rounded-xl p-3 mb-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">
+                {selectedIds.size} selected
+              </span>
+              <Button variant="ghost" size="sm" onClick={selectAll}>
+                Select all
+              </Button>
+              <Button variant="ghost" size="sm" onClick={clearSelection}>
+                <X className="w-4 h-4 mr-1" />
+                Clear
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={exportSelectedDocuments}>
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+              <Button variant="destructive" size="sm" onClick={deleteSelectedDocuments}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Documents list */}
         {loading ? (
@@ -224,6 +349,9 @@ export default function Dashboard() {
               <DocumentCard
                 key={doc.id}
                 document={doc}
+                selected={selectedIds.has(doc.id)}
+                selectionMode={selectionMode}
+                onToggleSelect={() => toggleSelection(doc.id)}
                 onView={() => navigate(`/document/${doc.id}`)}
                 onDelete={() => deleteDocument(doc.id)}
               />
@@ -276,10 +404,16 @@ function ActionCard({
 
 function DocumentCard({
   document,
+  selected,
+  selectionMode,
+  onToggleSelect,
   onView,
   onDelete,
 }: {
   document: Document;
+  selected?: boolean;
+  selectionMode?: boolean;
+  onToggleSelect?: () => void;
   onView: () => void;
   onDelete: () => void;
 }) {
@@ -290,8 +424,19 @@ function DocumentCard({
   });
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 hover:shadow-md transition-all duration-200 group">
-      <div className="flex items-start justify-between gap-4">
+    <div
+      className={`bg-card border rounded-xl p-5 hover:shadow-md transition-all duration-200 group ${
+        selected ? "border-accent bg-accent/5" : "border-border"
+      }`}
+    >
+      <div className="flex items-start gap-4">
+        {selectionMode && (
+          <Checkbox
+            checked={selected}
+            onCheckedChange={onToggleSelect}
+            className="mt-1"
+          />
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2">
             <span
@@ -309,7 +454,7 @@ function DocumentCard({
           </div>
 
           <h3
-            onClick={onView}
+            onClick={selectionMode ? onToggleSelect : onView}
             className="font-semibold text-lg mb-1 cursor-pointer hover:text-accent transition-colors truncate"
           >
             {document.title}
@@ -335,23 +480,25 @@ function DocumentCard({
           </div>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="opacity-0 group-hover:opacity-100">
-              <MoreVertical className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onView}>
-              <ExternalLink className="w-4 h-4 mr-2" />
-              View
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDelete} className="text-destructive">
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {!selectionMode && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" className="opacity-0 group-hover:opacity-100">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onView}>
+                <ExternalLink className="w-4 h-4 mr-2" />
+                View
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );
