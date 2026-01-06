@@ -71,8 +71,8 @@ export default function DocumentEditor() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [summary, setSummary] = useState("");
-  const [type, setType] = useState("general");
-  const [status, setStatus] = useState("draft");
+  const [type, setType] = useState<"sop" | "how_to" | "product_doc" | "reflection" | "general">("general");
+  const [status, setStatus] = useState<"draft" | "review" | "published">("draft");
   const [tags, setTags] = useState("");
   const [isPublic, setIsPublic] = useState(false);
 
@@ -98,8 +98,8 @@ export default function DocumentEditor() {
       setTitle(data.title);
       setContent(data.content || "");
       setSummary(data.summary || "");
-      setType(data.type as string);
-      setStatus(data.status as string);
+      setType(data.type as "sop" | "how_to" | "product_doc" | "reflection" | "general");
+      setStatus(data.status as "draft" | "review" | "published");
       setTags(data.tags?.join(", ") || "");
       setIsPublic(data.is_public);
     } catch (err) {
@@ -278,7 +278,7 @@ export default function DocumentEditor() {
 
               <div className="space-y-2">
                 <Label>Type</Label>
-                <Select value={type} onValueChange={setType}>
+                <Select value={type} onValueChange={(v) => setType(v as "sop" | "how_to" | "product_doc" | "reflection" | "general")}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -294,7 +294,7 @@ export default function DocumentEditor() {
 
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={status} onValueChange={setStatus}>
+                <Select value={status} onValueChange={(v) => setStatus(v as "draft" | "review" | "published")}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
